@@ -6,13 +6,16 @@ let databases = [];
 let pages = [];
 let currentEmail = null;
 let attachments = [];
+let isInitialized = false;
+let isSending = false;
 
 // DOM Elements
 const elements = {};
 
 // Initialize when Office is ready
 Office.onReady((info) => {
-    if (info.host === Office.HostType.Outlook) {
+    if (info.host === Office.HostType.Outlook && !isInitialized) {
+        isInitialized = true;
         initializeApp();
     }
 });
@@ -303,6 +306,12 @@ function toggleAttachmentsList() {
 
 // Send to Notion
 async function sendToNotion() {
+    // Prevent double submission
+    if (isSending) {
+        console.log('Already sending, ignoring duplicate request');
+        return;
+    }
+
     const databaseId = elements.databaseSelect.value;
     const parentPageId = elements.parentPageSelect.value;
 
@@ -311,6 +320,7 @@ async function sendToNotion() {
         return;
     }
 
+    isSending = true;
     showStatus('Sende zu Notion...', 'loading');
     elements.sendToNotionBtn.disabled = true;
 
@@ -348,6 +358,7 @@ async function sendToNotion() {
     } catch (error) {
         showStatus('Fehler: ' + error.message, 'error');
     } finally {
+        isSending = false;
         elements.sendToNotionBtn.disabled = false;
     }
 }
