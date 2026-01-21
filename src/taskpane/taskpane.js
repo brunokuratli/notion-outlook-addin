@@ -92,9 +92,10 @@ async function saveToken() {
     showStatus('Prüfe Token...', 'loading');
 
     try {
+        // Temporarily set the token for testing
+        notionToken = token;
         const response = await notionRequest('/users/me');
         if (response.ok) {
-            notionToken = token;
             localStorage.setItem('notion_token', token);
             showStatus('Token gespeichert!', 'success');
 
@@ -104,9 +105,11 @@ async function saveToken() {
                 loadDatabases();
             }, 1000);
         } else {
+            notionToken = null; // Reset on failure
             showStatus('Ungültiger Token', 'error');
         }
     } catch (error) {
+        notionToken = null; // Reset on error
         showStatus('Verbindungsfehler: ' + error.message, 'error');
     }
 }
