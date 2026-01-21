@@ -5,12 +5,14 @@
   "main": "index.js",
   "scripts": {
     "build": "webpack --mode production",
+    "build:cf": "npm run build && cp -r functions dist/",
     "dev": "webpack serve --mode development",
     "start": "npm run dev",
     "certs": "office-addin-dev-certs install",
     "validate": "office-addin-manifest validate manifest.xml",
     "predeploy": "npm run build && cp manifest-github.xml dist/manifest.xml",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "deploy:cf": "npm run build:cf && npx wrangler pages deploy dist --project-name=notion-outlook-addin"
   },
   "keywords": [
     "outlook",
@@ -24,10 +26,12 @@
     "copy-webpack-plugin": "^13.0.1",
     "gh-pages": "^6.3.0",
     "html-webpack-plugin": "^5.6.6",
+    "netlify-cli": "^23.13.5",
     "sharp": "^0.34.5",
     "webpack": "^5.104.1",
     "webpack-cli": "^6.0.1",
-    "webpack-dev-server": "^5.2.3"
+    "webpack-dev-server": "^5.2.3",
+    "wrangler": "^4.59.3"
   },
   "dependencies": {
     "@notionhq/client": "^5.7.0",

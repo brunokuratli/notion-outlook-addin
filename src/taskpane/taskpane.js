@@ -111,8 +111,12 @@ async function saveToken() {
     }
 }
 
-// Notion API Requests
+// Notion API Requests - uses Netlify Function as CORS proxy
 async function notionRequest(endpoint, method = 'GET', body = null) {
+    // Use the Netlify function proxy to avoid CORS issues
+    const baseUrl = window.location.origin;
+    const proxyUrl = `${baseUrl}/api/notion-proxy?endpoint=${encodeURIComponent(endpoint)}`;
+
     const options = {
         method,
         headers: {
@@ -126,7 +130,7 @@ async function notionRequest(endpoint, method = 'GET', body = null) {
         options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(`https://api.notion.com/v1${endpoint}`, options);
+    const response = await fetch(proxyUrl, options);
     const data = await response.json();
 
     return { ok: response.ok, status: response.status, data };
