@@ -511,51 +511,148 @@ async function uploadAttachments(pageId) {
         }]
     });
 
-    // Get attachment content and add to Notion
+    // Get attachment content, upload to storage, and add to Notion
     for (const att of selectedAttachments) {
         try {
+            showStatus(`Lade ${att.name} hoch...`, 'loading');
             const content = await getAttachmentContent(item, att.id);
 
-            // For file attachments, we create a text block with info
-            // Note: Direct file upload to Notion requires external URL or S3
-            // For now, we'll note the attachment details
+            // Upload file to Netlify Blob storage
+            const uploadResult = await uploadFileToStorage(att.name, content, att.contentType);
+
+            if (uploadResult.success && uploadResult.url) {
+                // Check if it's an image
+                const isImage = att.contentType && att.contentType.startsWith('image/');
+
+                if (isImage) {
+                    // Add as image block
+                    await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                        children: [{
+                            object: 'block',
+                            type: 'image',
+                            image: {
+                                type: 'external',
+                                external: {
+                                    url: uploadResult.url
+                                }
+                            }
+                        }]
+                    });
+                } else {
+                    // Add as file block with embed
+                    await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                        children: [{
+                            object: 'block',
+                            type: 'embed',
+                            embed: {
+                                url: uploadResult.url
+                            }
+                        }]
+                    });
+                }
+
+                // Add file info as caption
+                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                    children: [{
+                        object: 'block',
+                        type: 'callout',
+                        callout: {
+                            icon: { type: 'emoji', emoji: '📎' },
+                            rich_text: [{
+                                type: 'text',
+                                text: {
+                                    content: `${att.name} (${formatFileSize(att.size)})`,
+                                    link: { url: uploadResult.url }
+                                }
+                            }]
+                        }
+                    }]
+                });
+
+                // If it's a text-based file, also include content inline
+                if (isTextFile(att.contentType)) {
+                    try {
+                        const textContent = atob(content);
+                        const chunks = splitTextIntoChunks(textContent, 2000);
+
+                        for (const chunk of chunks) {
+                            await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                                children: [{
+                                    object: 'block',
+                                    type: 'code',
+                                    code: {
+                                        language: getCodeLanguage(att.name),
+                                        rich_text: [{ type: 'text', text: { content: chunk } }]
+                                    }
+                                }]
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Error decoding text content:', e);
+                    }
+                }
+            } else {
+                // Fallback: just show file info if upload failed
+                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                    children: [{
+                        object: 'block',
+                        type: 'callout',
+                        callout: {
+                            icon: { type: 'emoji', emoji: '⚠️' },
+                            rich_text: [{
+                                type: 'text',
+                                text: {
+                                    content: `${att.name} (${formatFileSize(att.size)}) - Upload fehlgeschlagen`
+                                }
+                            }]
+                        }
+                    }]
+                });
+            }
+        } catch (error) {
+            console.error('Error processing attachment:', att.name, error);
+            // Add error note to Notion
             await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
                 children: [{
                     object: 'block',
                     type: 'callout',
                     callout: {
-                        icon: { type: 'emoji', emoji: '📎' },
+                        icon: { type: 'emoji', emoji: '❌' },
                         rich_text: [{
                             type: 'text',
                             text: {
-                                content: `${att.name} (${formatFileSize(att.size)})\nTyp: ${att.contentType}`
+                                content: `Fehler bei ${att.name}: ${error.message}`
                             }
                         }]
                     }
                 }]
             });
-
-            // If it's a text-based file, include content
-            if (isTextFile(att.contentType)) {
-                const textContent = atob(content);
-                const chunks = splitTextIntoChunks(textContent, 2000);
-
-                for (const chunk of chunks) {
-                    await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
-                        children: [{
-                            object: 'block',
-                            type: 'code',
-                            code: {
-                                language: getCodeLanguage(att.name),
-                                rich_text: [{ type: 'text', text: { content: chunk } }]
-                            }
-                        }]
-                    });
-                }
-            }
-        } catch (error) {
-            console.error('Error processing attachment:', att.name, error);
         }
+    }
+}
+
+async function uploadFileToStorage(filename, base64Content, contentType) {
+    const baseUrl = window.location.origin;
+    const uploadUrl = `${baseUrl}/api/upload-file`;
+
+    try {
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                filename: filename,
+                content: base64Content,
+                contentType: contentType
+            })
+        });
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Upload error:', error);
+        return { success: false, error: error.message };
     }
 }
 
