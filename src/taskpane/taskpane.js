@@ -8,6 +8,7 @@ let currentEmail = null;
 let attachments = [];
 let isInitialized = false;
 let isSending = false;
+let lastSubmissionId = null; // Track to prevent duplicate submissions
 
 // DOM Elements
 const elements = {};
@@ -42,7 +43,21 @@ function initializeApp() {
     elements.status = document.getElementById('status');
     elements.settingsBtn = document.getElementById('settings-btn');
 
-    // Event Listeners
+    // Event Listeners - remove existing listeners first to prevent duplicates
+    elements.saveTokenBtn.replaceWith(elements.saveTokenBtn.cloneNode(true));
+    elements.refreshDbsBtn.replaceWith(elements.refreshDbsBtn.cloneNode(true));
+    elements.sendToNotionBtn.replaceWith(elements.sendToNotionBtn.cloneNode(true));
+    elements.settingsBtn.replaceWith(elements.settingsBtn.cloneNode(true));
+    elements.includeAttachments.replaceWith(elements.includeAttachments.cloneNode(true));
+
+    // Re-cache the replaced elements
+    elements.saveTokenBtn = document.getElementById('save-token-btn');
+    elements.refreshDbsBtn = document.getElementById('refresh-dbs-btn');
+    elements.sendToNotionBtn = document.getElementById('send-to-notion-btn');
+    elements.settingsBtn = document.getElementById('settings-btn');
+    elements.includeAttachments = document.getElementById('include-attachments');
+
+    // Now add fresh event listeners
     elements.saveTokenBtn.addEventListener('click', saveToken);
     elements.refreshDbsBtn.addEventListener('click', loadDatabases);
     elements.sendToNotionBtn.addEventListener('click', sendToNotion);
@@ -306,7 +321,7 @@ function toggleAttachmentsList() {
 
 // Send to Notion
 async function sendToNotion() {
-    // Prevent double submission
+    // Prevent double submission with multiple guards
     if (isSending) {
         console.log('Already sending, ignoring duplicate request');
         return;
@@ -320,7 +335,19 @@ async function sendToNotion() {
         return;
     }
 
+    // Generate unique submission ID based on email + target + timestamp (within 30 second window)
+    const timeWindow = Math.floor(Date.now() / 30000); // 30-second windows
+    const submissionId = `${currentEmail?.subject || ''}-${databaseId || parentPageId}-${timeWindow}`;
+
+    // Check if this exact submission was already made
+    if (lastSubmissionId === submissionId) {
+        console.log('Duplicate submission detected, ignoring');
+        showStatus('Diese E-Mail wurde bereits gesendet', 'success');
+        return;
+    }
+
     isSending = true;
+    lastSubmissionId = submissionId;
     showStatus('Sende zu Notion...', 'loading');
     elements.sendToNotionBtn.disabled = true;
 
