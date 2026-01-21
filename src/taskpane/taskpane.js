@@ -511,187 +511,127 @@ async function uploadAttachments(pageId) {
         }]
     });
 
-    // Process each attachment
+    // Upload each attachment to Notion
     for (const att of selectedAttachments) {
         try {
-            showStatus(`Verarbeite ${att.name}...`, 'loading');
+            showStatus(`Lade ${att.name} hoch...`, 'loading');
             const base64Content = await getAttachmentContent(item, att.id);
             const isImage = att.contentType && att.contentType.startsWith('image/');
 
-            // Create data URL for the file
-            const dataUrl = `data:${att.contentType || 'application/octet-stream'};base64,${base64Content}`;
+            // Upload file to Notion using the File Upload API
+            const uploadResult = await uploadFileToNotion(att.name, base64Content, att.contentType);
 
-            // For images, we can try to embed them directly
-            if (isImage) {
-                // Notion doesn't support data URLs for images, so we show info + provide download instructions
-                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
-                    children: [{
-                        object: 'block',
-                        type: 'callout',
-                        callout: {
-                            icon: { type: 'emoji', emoji: '🖼️' },
-                            rich_text: [{
-                                type: 'text',
-                                text: { content: `Bild: ${att.name} (${formatFileSize(att.size)})` }
-                            }]
-                        }
-                    }]
-                });
-            } else {
-                // For other files, show file info
-                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
-                    children: [{
-                        object: 'block',
-                        type: 'callout',
-                        callout: {
-                            icon: { type: 'emoji', emoji: '📎' },
-                            rich_text: [{
-                                type: 'text',
-                                text: { content: `Datei: ${att.name} (${formatFileSize(att.size)})` }
-                            }]
-                        }
-                    }]
-                });
-            }
-
-            // Store the file data in a toggle block so it can be retrieved later
-            // The data is stored as Base64 in a code block inside a toggle
-            await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
-                children: [{
-                    object: 'block',
-                    type: 'toggle',
-                    toggle: {
-                        rich_text: [{
-                            type: 'text',
-                            text: { content: `📥 ${att.name} herunterladen (Klicken zum Öffnen)` }
-                        }],
-                        children: [{
-                            object: 'block',
-                            type: 'paragraph',
-                            paragraph: {
-                                rich_text: [{
-                                    type: 'text',
-                                    text: {
-                                        content: '➡️ Kopiere den Code unten und öffne: '
-                                    }
-                                }, {
-                                    type: 'text',
-                                    text: {
-                                        content: 'base64-to-file.com',
-                                        link: { url: 'https://base64.guru/converter/decode/file' }
-                                    }
-                                }]
-                            }
-                        }]
-                    }
-                }]
-            });
-
-            // Get the toggle block we just created to add children
-            const blocksResponse = await notionRequest(`/blocks/${pageId}/children`);
-            if (blocksResponse.ok) {
-                const blocks = blocksResponse.data.results;
-                const toggleBlock = blocks.find(b =>
-                    b.type === 'toggle' &&
-                    b.toggle?.rich_text?.[0]?.text?.content?.includes(att.name)
-                );
-
-                if (toggleBlock) {
-                    // Split base64 into chunks (Notion has 2000 char limit per text block)
-                    const chunks = splitTextIntoChunks(base64Content, 2000);
-
-                    // Add filename info
-                    await notionRequest(`/blocks/${toggleBlock.id}/children`, 'PATCH', {
-                        children: [{
-                            object: 'block',
-                            type: 'paragraph',
-                            paragraph: {
-                                rich_text: [{
-                                    type: 'text',
-                                    text: { content: `Dateiname: ${att.name}` }
-                                }]
-                            }
-                        }, {
-                            object: 'block',
-                            type: 'paragraph',
-                            paragraph: {
-                                rich_text: [{
-                                    type: 'text',
-                                    text: { content: `MIME-Type: ${att.contentType || 'application/octet-stream'}` }
-                                }]
-                            }
-                        }]
-                    });
-
-                    // Add Base64 data in code blocks
-                    for (let i = 0; i < chunks.length; i++) {
-                        await notionRequest(`/blocks/${toggleBlock.id}/children`, 'PATCH', {
-                            children: [{
-                                object: 'block',
-                                type: 'code',
-                                code: {
-                                    language: 'plain text',
-                                    rich_text: [{
-                                        type: 'text',
-                                        text: { content: chunks[i] }
-                                    }],
-                                    caption: chunks.length > 1 ? [{
-                                        type: 'text',
-                                        text: { content: `Teil ${i + 1} von ${chunks.length}` }
-                                    }] : []
-                                }
-                            }]
-                        });
-                    }
-                }
-            }
-
-            // If it's a text-based file, also show content inline
-            if (isTextFile(att.contentType)) {
-                try {
-                    const textContent = atob(base64Content);
-                    const textChunks = splitTextIntoChunks(textContent, 2000);
-
+            if (uploadResult.success && uploadResult.file_upload_id) {
+                // File uploaded successfully - add it as a block
+                if (isImage) {
+                    // Add as image block
                     await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
                         children: [{
                             object: 'block',
-                            type: 'toggle',
-                            toggle: {
-                                rich_text: [{
-                                    type: 'text',
-                                    text: { content: `📄 Inhalt von ${att.name} anzeigen` }
-                                }]
+                            type: 'image',
+                            image: {
+                                type: 'file_upload',
+                                file_upload: {
+                                    id: uploadResult.file_upload_id
+                                }
                             }
                         }]
                     });
+                } else {
+                    // Add as file block
+                    await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                        children: [{
+                            object: 'block',
+                            type: 'file',
+                            file: {
+                                type: 'file_upload',
+                                file_upload: {
+                                    id: uploadResult.file_upload_id
+                                },
+                                name: att.name
+                            }
+                        }]
+                    });
+                }
 
-                    // Get the content toggle
-                    const contentBlocksResponse = await notionRequest(`/blocks/${pageId}/children`);
-                    if (contentBlocksResponse.ok) {
-                        const contentBlocks = contentBlocksResponse.data.results;
-                        const contentToggle = contentBlocks.find(b =>
-                            b.type === 'toggle' &&
-                            b.toggle?.rich_text?.[0]?.text?.content?.includes(`Inhalt von ${att.name}`)
-                        );
+                // Add file info
+                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                    children: [{
+                        object: 'block',
+                        type: 'callout',
+                        callout: {
+                            icon: { type: 'emoji', emoji: isImage ? '🖼️' : '📎' },
+                            rich_text: [{
+                                type: 'text',
+                                text: { content: `${att.name} (${formatFileSize(att.size)})` }
+                            }]
+                        }
+                    }]
+                });
 
-                        if (contentToggle) {
-                            for (const chunk of textChunks) {
-                                await notionRequest(`/blocks/${contentToggle.id}/children`, 'PATCH', {
-                                    children: [{
-                                        object: 'block',
-                                        type: 'code',
-                                        code: {
-                                            language: getCodeLanguage(att.name),
-                                            rich_text: [{ type: 'text', text: { content: chunk } }]
-                                        }
+                // If it's a text-based file, also show content inline
+                if (isTextFile(att.contentType)) {
+                    try {
+                        const textContent = atob(base64Content);
+                        const textChunks = splitTextIntoChunks(textContent, 2000);
+
+                        await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                            children: [{
+                                object: 'block',
+                                type: 'toggle',
+                                toggle: {
+                                    rich_text: [{
+                                        type: 'text',
+                                        text: { content: `📄 Inhalt von ${att.name} anzeigen` }
                                     }]
-                                });
+                                }
+                            }]
+                        });
+
+                        // Get the content toggle
+                        const contentBlocksResponse = await notionRequest(`/blocks/${pageId}/children`);
+                        if (contentBlocksResponse.ok) {
+                            const contentBlocks = contentBlocksResponse.data.results;
+                            const contentToggle = contentBlocks.find(b =>
+                                b.type === 'toggle' &&
+                                b.toggle?.rich_text?.[0]?.text?.content?.includes(`Inhalt von ${att.name}`)
+                            );
+
+                            if (contentToggle) {
+                                for (const chunk of textChunks) {
+                                    await notionRequest(`/blocks/${contentToggle.id}/children`, 'PATCH', {
+                                        children: [{
+                                            object: 'block',
+                                            type: 'code',
+                                            code: {
+                                                language: getCodeLanguage(att.name),
+                                                rich_text: [{ type: 'text', text: { content: chunk } }]
+                                            }
+                                        }]
+                                    });
+                                }
                             }
                         }
+                    } catch (e) {
+                        console.error('Error decoding text content:', e);
                     }
-                } catch (e) {
-                    console.error('Error decoding text content:', e);
                 }
+            } else {
+                // Upload failed - show error
+                const errorMsg = uploadResult.details?.message || uploadResult.error || 'Unbekannter Fehler';
+                await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
+                    children: [{
+                        object: 'block',
+                        type: 'callout',
+                        callout: {
+                            icon: { type: 'emoji', emoji: '⚠️' },
+                            rich_text: [{
+                                type: 'text',
+                                text: { content: `${att.name} (${formatFileSize(att.size)}) - Upload fehlgeschlagen: ${errorMsg}` }
+                            }]
+                        }
+                    }]
+                });
             }
 
         } catch (error) {
@@ -710,6 +650,33 @@ async function uploadAttachments(pageId) {
                 }]
             });
         }
+    }
+}
+
+async function uploadFileToNotion(filename, base64Content, contentType) {
+    const baseUrl = window.location.origin;
+    const uploadUrl = `${baseUrl}/api/notion-file-upload`;
+
+    try {
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${notionToken}`,
+                'Notion-Version': '2022-06-28'
+            },
+            body: JSON.stringify({
+                filename: filename,
+                content: base64Content,
+                contentType: contentType
+            })
+        });
+
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Upload error:', error);
+        return { success: false, error: error.message };
     }
 }
 
