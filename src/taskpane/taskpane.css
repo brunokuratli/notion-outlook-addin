@@ -1,0 +1,327 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #37352f;
+    background-color: #ffffff;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 16px;
+}
+
+header {
+    margin-bottom: 20px;
+}
+
+header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #37352f;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+header h1::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #000 0%, #333 100%);
+    border-radius: 4px;
+}
+
+.section {
+    flex: 1;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 16px;
+    position: relative;
+}
+
+.form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b6b6b;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #2383e2;
+    box-shadow: 0 0 0 3px rgba(35, 131, 226, 0.1);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 4px;
+    color: #9b9b9b;
+}
+
+.form-group small a {
+    color: #2383e2;
+    text-decoration: none;
+}
+
+.form-group small a:hover {
+    text-decoration: underline;
+}
+
+.btn-icon {
+    position: absolute;
+    right: 4px;
+    top: 24px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    color: #6b6b6b;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.btn-icon:hover {
+    background-color: #f0f0f0;
+}
+
+/* Email Preview */
+.email-preview {
+    background: #f7f6f3;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+}
+
+.email-preview h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    word-break: break-word;
+}
+
+.email-meta {
+    font-size: 12px;
+    color: #6b6b6b;
+}
+
+.email-meta span {
+    display: block;
+}
+
+/* Options */
+.options {
+    margin-bottom: 20px;
+}
+
+.options h4 {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b6b6b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #2383e2;
+}
+
+/* Attachments */
+.attachments-section {
+    margin-bottom: 20px;
+}
+
+.attachments-section h4 {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b6b6b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.attachments-list {
+    list-style: none;
+    background: #f7f6f3;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.attachments-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.attachments-list li:last-child {
+    border-bottom: none;
+}
+
+.attachments-list li input[type="checkbox"] {
+    flex-shrink: 0;
+}
+
+.attachment-name {
+    flex: 1;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.attachment-size {
+    font-size: 11px;
+    color: #9b9b9b;
+    flex-shrink: 0;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    width: 100%;
+    background: #2383e2;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #1a73d4;
+}
+
+.btn-primary:disabled {
+    background: #c4c4c4;
+    cursor: not-allowed;
+}
+
+.btn-link {
+    background: transparent;
+    border: none;
+    color: #6b6b6b;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 8px 0;
+}
+
+.btn-link:hover {
+    color: #37352f;
+}
+
+.actions {
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+/* Status */
+.status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: center;
+}
+
+.status.success {
+    background: #e6f4ea;
+    color: #137333;
+}
+
+.status.error {
+    background: #fce8e6;
+    color: #c5221f;
+}
+
+.status.loading {
+    background: #e8f0fe;
+    color: #1967d2;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid #e8e8e8;
+    text-align: center;
+}
+
+/* Loading Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 300px) {
+    .container {
+        padding: 12px;
+    }
+
+    .email-preview {
+        padding: 10px 12px;
+    }
+}
