@@ -226,10 +226,12 @@ function loadEmailData() {
         return;
     }
 
+    const emailDate = item.dateTimeCreated ? new Date(item.dateTimeCreated) : null;
     currentEmail = {
         subject: item.subject,
         from: item.from ? item.from.displayName + ' <' + item.from.emailAddress + '>' : 'Unbekannt',
-        dateTime: item.dateTimeCreated ? new Date(item.dateTimeCreated).toLocaleString('de-DE') : ''
+        dateTime: emailDate ? emailDate.toLocaleString('de-DE') : '',
+        dateTimeISO: emailDate ? emailDate.toISOString() : null
     };
 
     elements.emailSubject.textContent = currentEmail.subject || '(Kein Betreff)';
@@ -393,33 +395,69 @@ function buildPageContent() {
 }
 
 async function createDatabasePage(databaseId, children) {
-    // First, get database schema to find title property
+    // First, get database schema to find properties
     const dbResponse = await notionRequest(`/databases/${databaseId}`);
 
     if (!dbResponse.ok) {
         return dbResponse;
     }
 
-    const properties = dbResponse.data.properties;
+    const dbProperties = dbResponse.data.properties;
     let titleProperty = 'Name'; // Default
 
-    // Find the title property
-    for (const [key, value] of Object.entries(properties)) {
+    // Find the title property and other properties
+    const availableProps = {};
+    for (const [key, value] of Object.entries(dbProperties)) {
         if (value.type === 'title') {
             titleProperty = key;
-            break;
         }
+        availableProps[key.toLowerCase()] = { name: key, type: value.type };
+    }
+
+    // Build properties object
+    const pageProperties = {
+        [titleProperty]: {
+            title: [{
+                text: { content: currentEmail.subject || '(Kein Betreff)' }
+            }]
+        }
+    };
+
+    // Add From property if available
+    if (availableProps['from']) {
+        pageProperties[availableProps['from'].name] = {
+            rich_text: [{
+                text: { content: currentEmail.from || '' }
+            }]
+        };
+    }
+
+    // Add Date property if available
+    if (availableProps['date'] && currentEmail.dateTimeISO) {
+        pageProperties[availableProps['date'].name] = {
+            date: {
+                start: currentEmail.dateTimeISO
+            }
+        };
+    }
+
+    // Add Status property if available (set to "Neu")
+    if (availableProps['status'] && availableProps['status'].type === 'select') {
+        pageProperties[availableProps['status'].name] = {
+            select: { name: 'Neu' }
+        };
+    }
+
+    // Add Has Attachments property if available
+    if (availableProps['has attachments'] && availableProps['has attachments'].type === 'checkbox') {
+        pageProperties[availableProps['has attachments'].name] = {
+            checkbox: attachments.length > 0
+        };
     }
 
     const pageData = {
         parent: { database_id: databaseId },
-        properties: {
-            [titleProperty]: {
-                title: [{
-                    text: { content: currentEmail.subject || '(Kein Betreff)' }
-                }]
-            }
-        },
+        properties: pageProperties,
         children: children
     };
 
