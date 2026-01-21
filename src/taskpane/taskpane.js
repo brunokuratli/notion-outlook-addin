@@ -511,41 +511,45 @@ async function uploadAttachments(pageId) {
         }]
     });
 
-    // Get attachment content, upload to storage, and add to Notion
+    // Get attachment content and upload directly to Notion
     for (const att of selectedAttachments) {
         try {
             showStatus(`Lade ${att.name} hoch...`, 'loading');
             const content = await getAttachmentContent(item, att.id);
 
-            // Upload file to Netlify Blob storage
-            const uploadResult = await uploadFileToStorage(att.name, content, att.contentType);
+            // Upload file directly to Notion via our proxy
+            const uploadResult = await uploadFileToNotion(att.name, content, att.contentType, pageId);
 
-            if (uploadResult.success && uploadResult.url) {
+            if (uploadResult.success && uploadResult.file_id) {
                 // Check if it's an image
                 const isImage = att.contentType && att.contentType.startsWith('image/');
 
                 if (isImage) {
-                    // Add as image block
+                    // Add as image block with Notion file reference
                     await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
                         children: [{
                             object: 'block',
                             type: 'image',
                             image: {
-                                type: 'external',
-                                external: {
-                                    url: uploadResult.url
+                                type: 'file',
+                                file: {
+                                    file_id: uploadResult.file_id
                                 }
                             }
                         }]
                     });
                 } else {
-                    // Add as file block with embed
+                    // Add as file block with Notion file reference
                     await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
                         children: [{
                             object: 'block',
-                            type: 'embed',
-                            embed: {
-                                url: uploadResult.url
+                            type: 'file',
+                            file: {
+                                type: 'file',
+                                file: {
+                                    file_id: uploadResult.file_id
+                                },
+                                name: att.name
                             }
                         }]
                     });
@@ -561,8 +565,7 @@ async function uploadAttachments(pageId) {
                             rich_text: [{
                                 type: 'text',
                                 text: {
-                                    content: `${att.name} (${formatFileSize(att.size)})`,
-                                    link: { url: uploadResult.url }
+                                    content: `${att.name} (${formatFileSize(att.size)})`
                                 }
                             }]
                         }
@@ -592,7 +595,8 @@ async function uploadAttachments(pageId) {
                     }
                 }
             } else {
-                // Fallback: just show file info if upload failed
+                // Fallback: show file info if upload failed
+                const errorMsg = uploadResult.details?.message || uploadResult.error || 'Unbekannter Fehler';
                 await notionRequest(`/blocks/${pageId}/children`, 'PATCH', {
                     children: [{
                         object: 'block',
@@ -602,7 +606,7 @@ async function uploadAttachments(pageId) {
                             rich_text: [{
                                 type: 'text',
                                 text: {
-                                    content: `${att.name} (${formatFileSize(att.size)}) - Upload fehlgeschlagen`
+                                    content: `${att.name} (${formatFileSize(att.size)}) - Upload fehlgeschlagen: ${errorMsg}`
                                 }
                             }]
                         }
@@ -631,20 +635,23 @@ async function uploadAttachments(pageId) {
     }
 }
 
-async function uploadFileToStorage(filename, base64Content, contentType) {
+async function uploadFileToNotion(filename, base64Content, contentType, pageId) {
     const baseUrl = window.location.origin;
-    const uploadUrl = `${baseUrl}/api/upload-file`;
+    const uploadUrl = `${baseUrl}/api/notion-file-upload`;
 
     try {
         const response = await fetch(uploadUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${notionToken}`,
+                'Notion-Version': '2022-06-28'
             },
             body: JSON.stringify({
                 filename: filename,
                 content: base64Content,
-                contentType: contentType
+                contentType: contentType,
+                pageId: pageId
             })
         });
 
